@@ -14,6 +14,10 @@ const tones = {
   blue: "bg-[#202b36] text-[#8fc8ef]",
 };
 
+/**
+ * AdminStatCard displays a single metric with a label, value, description,
+ * and a styled icon badge for the admin dashboard overview.
+ */
 export default function AdminStatCard({
   label,
   value,
@@ -22,17 +26,19 @@ export default function AdminStatCard({
   tone = "orange",
 }: AdminStatCardProps) {
   return (
-    <article className="rounded-xl border border-[#292929] bg-[#161616] p-4 sm:p-5">
+    <article className="rounded-xl border border-[#292929] bg-[#161616] p-4 sm:p-5 transition-colors duration-200 hover:border-[#383838]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="m-0 text-[11px] text-[#999]">{label}</p>
-          <strong className="mt-3 block font-['Space_Grotesk'] text-2xl font-semibold">{value}</strong>
+          <p className="m-0 text-xs font-medium text-[#999]">{label}</p>
+          <strong className="mt-2 block font-['Space_Grotesk'] text-2xl font-semibold text-white">
+            {value}
+          </strong>
         </div>
-        <div className={`grid h-9 w-9 place-items-center rounded-lg ${tones[tone]}`}>
-          <Icon size={17} />
+        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tones[tone]}`}>
+          <Icon size={18} />
         </div>
       </div>
-      <p className="mb-0 mt-3 text-[10px] text-[#777]">{helper}</p>
+      <p className="m-0 mt-3 text-[11px] text-[#777]">{helper}</p>
     </article>
   );
 }

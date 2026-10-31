@@ -1,10 +1,6 @@
 import type { FormEvent } from "react";
 import {
-  Code2,
-  Hash,
   Megaphone,
-  MessageCircle,
-  MessageSquare,
   MoreHorizontal,
   Paperclip,
   Pin,
@@ -14,6 +10,9 @@ import {
   Sparkles,
   UserRound,
   Users,
+  MessageSquare,
+  MessageCircle,
+  Code2,
 } from "lucide-react";
 import type { ChatMessage } from "../../chatData";
 import type { CommunityRoom, CommunityView } from "./communityTypes";
@@ -48,11 +47,32 @@ export default function ChatConversation({
   onToggleReaction,
   onNotification,
 }: ChatConversationProps) {
+  
+  // Helper to determine composer input placeholder
+  const getPlaceholderText = () => {
+    if (activeRoomId === "announcements") return "Message #academy-announcements...";
+    if (activeRoomId.startsWith("dm-")) return `Message ${currentRoom.name}...`;
+    return `Message #${currentRoom.name}...`;
+  };
+
+  const handleCopyMessage = async (text: string) => {
+    if (!navigator.clipboard?.writeText) {
+      onNotification("Clipboard access is unavailable in this browser.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      onNotification("Message copied to clipboard.");
+    } catch {
+      onNotification("Unable to copy the message.");
+    }
+  };
+
   return (
-    <section className="chat-main">
+    <section className="chat-main" aria-label="Chat Conversation">
+      {/* Banner: Community View */}
       {activeView === "community" && (
         <div className="channel-banner">
-          {/* <div className="banner-icon"><Hash size={21} /></div> */}
           <div className="banner-copy">
             <div className="banner-title capitalize">
               {currentRoom.name}
@@ -60,7 +80,9 @@ export default function ChatConversation({
             </div>
             <p>{currentRoom.description}</p>
           </div>
-          <div className="banner-members"><Users size={16} /> {currentRoom.members} <span>members</span></div>
+          <div className="banner-members">
+            <Users size={16} /> {currentRoom.members} <span>members</span>
+          </div>
           <button
             className="icon-btn banner-more"
             onClick={() => onNotification("Channel settings are a demo placeholder.")}
@@ -71,6 +93,7 @@ export default function ChatConversation({
         </div>
       )}
 
+      {/* Banner: Direct Message View */}
       {activeView === "direct" && (
         <div className="channel-banner">
           <div className="avatar avatar-large">{currentRoom.icon}</div>
@@ -91,22 +114,28 @@ export default function ChatConversation({
         </div>
       )}
 
+      {/* Banner: Announcements View */}
       {activeView === "announcements" && (
         <div className="channel-banner announcement-banner">
           <div className="banner-icon"><Megaphone size={21} /></div>
           <div className="banner-copy">
-            <div className="banner-title">Academy announcements<span className="pill-live">OFFICIAL</span></div>
+            <div className="banner-title">
+              Academy announcements <span className="pill-live">OFFICIAL</span>
+            </div>
             <p>Important updates from Tech Flareconcept Academy</p>
           </div>
         </div>
       )}
 
+      {/* Message Scroll Area */}
       <div className="message-scroll" key={activeRoomId}>
         {activeView === "community" && (
           <div className="welcome-channel">
-            <div className="welcome-symbol"><Sparkles size={23} /></div>
+            <div className="welcome-header flex items-center gap-2">
+              <div className="welcome-symbol"><Sparkles size={23} /></div>
             <h2 className="capitalize">Welcome to {currentRoom.name}!</h2>
-            <p>{currentRoom.description}. Introduce yourself, ask questions, and help your fellow students grow.</p>
+            </div>
+            {/* <p>{currentRoom.description}. Introduce yourself, ask questions, and help your fellow students grow.</p> */}
             <div className="welcome-tags">
               <span><MessageCircle size={13} /> Be helpful</span>
               <span><ShieldCheck size={13} /> Be respectful</span>
@@ -136,13 +165,17 @@ export default function ChatConversation({
         {messages.map((message, index) => {
           const previous = messages[index - 1];
           const grouped = previous && previous.sender === message.sender && previous.time === message.time;
+          
           return (
             <div className={`message-row ${message.mine ? "my-message" : ""}`} key={message.id}>
               {!grouped ? (
                 <div className={`avatar message-avatar ${message.sender === "Academy Founder" ? "avatar-orange" : ""}`}>
                   {message.mine ? getInitials(userName) : message.initials}
                 </div>
-              ) : <div className="avatar-spacer" />}
+              ) : (
+                <div className="avatar-spacer" />
+              )}
+              
               <div className="message-body">
                 {!grouped && (
                   <div className="message-meta">
@@ -158,17 +191,10 @@ export default function ChatConversation({
                   </button>
                 )}
               </div>
+
               <button
                 className="message-more"
-                onClick={() => {
-                  if (navigator.clipboard?.writeText) {
-                    navigator.clipboard.writeText(message.text)
-                      .then(() => onNotification("Message copied."))
-                      .catch(() => onNotification("Unable to copy the message."));
-                  } else {
-                    onNotification("Clipboard access is unavailable in this browser.");
-                  }
-                }}
+                onClick={() => handleCopyMessage(message.text)}
                 aria-label="Copy message text"
               >
                 <MoreHorizontal size={17} />
@@ -178,15 +204,19 @@ export default function ChatConversation({
         })}
       </div>
 
+      {/* Message Composer Form */}
       <form className="composer-wrap" onSubmit={onSendMessage}>
         {!canSendMessage && (
-          <div className="read-only-hint"><ShieldCheck size={14} /> {blockedReason}</div>
+          <div className="read-only-hint">
+            <ShieldCheck size={14} /> {blockedReason}
+          </div>
         )}
         {activeView === "announcements" && (
           <div className="read-only-hint">
             <ShieldCheck size={14} /> Demo note: announcement permissions are not enforced in this frontend version.
           </div>
         )}
+
         <div className="composer">
           <button
             type="button"
@@ -196,19 +226,15 @@ export default function ChatConversation({
           >
             <Paperclip size={18} />
           </button>
+
           <input
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
             disabled={!canSendMessage}
-            placeholder={`Message ${
-              activeRoomId === "announcements"
-                ? "#academy-announcements"
-                : activeRoomId.startsWith("dm-")
-                ? currentRoom.name
-                : `#${currentRoom.name}`
-            }...`}
+            placeholder={getPlaceholderText()}
             aria-label="Write a message"
           />
+
           <button
             type="button"
             className="composer-tool emoji-tool"
@@ -218,10 +244,17 @@ export default function ChatConversation({
           >
             <Smile size={18} />
           </button>
-          <button type="submit" className="send-btn" disabled={!draft.trim() || !canSendMessage} aria-label="Send message">
+
+          <button 
+            type="submit" 
+            className="send-btn" 
+            disabled={!draft.trim() || !canSendMessage} 
+            aria-label="Send message"
+          >
             <Send size={17} />
           </button>
         </div>
+
         <div className="composer-foot">
           <span><kbd>Enter</kbd> to send <span className="foot-dot">·</span> Be kind and constructive</span>
           <span>Powered by <strong>TF Academy</strong></span>

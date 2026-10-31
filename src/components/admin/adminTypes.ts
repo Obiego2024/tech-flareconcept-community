@@ -1,4 +1,4 @@
-export type AdminSection = "overview" | "moderation" | "channels" | "settings";
+export type AdminSection = "overview" | "students" | "moderation" | "channels" | "settings";
 
 export type AdminNotice = {
   message: string;

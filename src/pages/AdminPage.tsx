@@ -6,6 +6,7 @@ import AdminSidebar from "../components/admin/AdminSidebar";
 import ChannelManagementPanel from "../components/admin/ChannelManagementPanel";
 import ChatSettingsPanel from "../components/admin/ChatSettingsPanel";
 import MessageModerationPanel from "../components/admin/MessageModerationPanel";
+import StudentManagementPanel from "../components/admin/StudentManagementPanel";
 import type { AdminSection, AdminNotice } from "../components/admin/adminTypes";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -21,7 +22,7 @@ import {
 } from "../chatData";
 
 export default function AdminPage() {
-  const { user, logout } = useAuth();
+  const { user, students, setStudentSuspended, deleteStudent, logout } = useAuth();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,6 +57,27 @@ export default function AdminPage() {
     } catch {
       setNotice({ message: "Could not remove the message. Check browser storage and try again.", error: true });
     }
+  };
+
+  const handleSetStudentSuspended = (email: string, suspended: boolean) => {
+    const error = setStudentSuspended(email, suspended);
+    setNotice(
+      error
+        ? { message: error, error: true }
+        : {
+            message: `Student account ${suspended ? "suspended" : "restored"}.`,
+            error: false,
+          }
+    );
+  };
+
+  const handleDeleteStudent = (email: string) => {
+    const error = deleteStudent(email);
+    setNotice(
+      error
+        ? { message: error, error: true }
+        : { message: "Student account deleted.", error: false }
+    );
   };
 
   const handleAddChannel = (name: string, description: string) => {
@@ -112,6 +134,15 @@ export default function AdminPage() {
     }
     if (activeSection === "moderation") {
       return <MessageModerationPanel messages={messages} onRemove={handleDeleteMessage} />;
+    }
+    if (activeSection === "students") {
+      return (
+        <StudentManagementPanel
+          students={students}
+          onSetSuspended={handleSetStudentSuspended}
+          onDelete={handleDeleteStudent}
+        />
+      );
     }
     if (activeSection === "channels") {
       return (
