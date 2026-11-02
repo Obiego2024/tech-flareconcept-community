@@ -7,6 +7,13 @@ export type ChatMessage = {
   time: string;
   mine: boolean;
   reaction?: string;
+  attachment?: ChatAttachment;
+};
+
+export type ChatAttachment = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
 };
 
 export type ChatSettings = {

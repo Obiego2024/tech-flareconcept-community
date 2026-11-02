@@ -37,6 +37,7 @@ export default function MessageModerationPanel({
         !search ||
         message.text.toLowerCase().includes(search) ||
         message.sender.toLowerCase().includes(search) ||
+        message.attachment?.name.toLowerCase().includes(search) ||
         (ROOM_NAMES[message.roomId] ?? message.roomId).toLowerCase().includes(search)
       )
       .reverse();
@@ -93,6 +94,11 @@ export default function MessageModerationPanel({
                   </span>
                 </div>
                 <p className="m-0 wrap-break-word text-xs leading-relaxed text-[#bbb]">{message.text}</p>
+                {message.attachment && (
+                  <p className="mb-0 mt-1 text-[10px] text-[#8b5cf6]">
+                    Attachment: {message.attachment.name}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

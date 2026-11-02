@@ -1,10 +1,12 @@
 import {
   ChevronDown,
+  ImagePlus,
   LogOut,
   Megaphone,
   MessageCircle,
   MessagesSquare,
   MoreHorizontal,
+  PanelLeftClose,
   Plus,
   Settings,
   Users,
@@ -12,50 +14,60 @@ import {
 } from "lucide-react";
 import { isAdminEmail, type User } from "../../context/AuthContext";
 import type { CommunityRoom, CommunityView } from "./communityTypes";
-import { getInitials } from "./communityTypes";
+import { COMMUNITY_PEOPLE, getInitials } from "./communityTypes";
 
 const logo = new URL("../../assets/logo-removebg-preview (1).png", import.meta.url).href;
 
 interface CommunitySidebarProps {
   user: User | null;
   userName: string;
+  profileImage: string;
   nameDraft: string;
   rooms: CommunityRoom[];
   activeView: CommunityView;
   activeRoomId: string;
   searchQuery: string;
   isOpen: boolean;
+  isCollapsed: boolean;
   showProfile: boolean;
   onSelectView: (view: CommunityView) => void;
   onOpenRoom: (room: CommunityRoom) => void;
   onToggleProfile: () => void;
   onNameDraftChange: (value: string) => void;
   onSaveName: () => void;
+  onProfileImageSelect: (file: File | null) => void;
   onSignOut: () => void;
   onAdmin: () => void;
   onNotification: (message: string) => void;
   onClose: () => void;
+  onToggleCollapse: () => void;
+  onMessage: (name: string) => void;
 }
 
 export default function CommunitySidebar({
   user,
   userName,
+  profileImage,
   nameDraft,
   rooms,
   activeView,
   activeRoomId,
   searchQuery,
   isOpen,
+  isCollapsed,
   showProfile,
   onSelectView,
   onOpenRoom,
   onToggleProfile,
   onNameDraftChange,
   onSaveName,
+  onProfileImageSelect,
   onSignOut,
   onAdmin,
   onNotification,
   onClose,
+  onToggleCollapse,
+  onMessage,
 }: CommunitySidebarProps) {
   
   // Search filter helper
@@ -67,11 +79,17 @@ export default function CommunitySidebar({
 
   const groupRooms = rooms.filter((room) => room.type === "group" && matchesSearch(room));
   const directRooms = rooms.filter((room) => room.type === "direct" && matchesSearch(room));
+  const filteredPeople = COMMUNITY_PEOPLE.filter(
+    (person) =>
+      !search ||
+      person.name.toLowerCase().includes(search) ||
+      person.role.toLowerCase().includes(search)
+  );
 
   return (
     <>
-      <aside 
-        className={`sidebar ${isOpen ? "sidebar-open" : ""}`} 
+      <aside
+        className={`sidebar ${isOpen ? "sidebar-open" : ""} ${isCollapsed ? "sidebar-collapsed" : ""}`}
         aria-label="Community Sidebar"
         style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}
       >
@@ -90,10 +108,18 @@ export default function CommunitySidebar({
           >
             <X size={18} aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            className="icon-btn desktop-sidebar-close"
+            onClick={onToggleCollapse}
+            aria-label="Close community sidebar"
+          >
+            <PanelLeftClose size={18} aria-hidden="true" />
+          </button>
         </div>
 
         {/* Workspace Switcher (Sticky at top) */}
-        <div style={{ flexShrink: 0, padding: "0 12px" }}>
+        {/* <div style={{ flexShrink: 0, padding: "0 12px" }}>
           <button
             type="button"
             className="workspace-switch"
@@ -107,14 +133,14 @@ export default function CommunitySidebar({
             </div>
             <ChevronDown size={16} className="muted-icon" aria-hidden="true" />
           </button>
-        </div>
+        </div> */}
 
         {/* Scrollable Navigation Area (Takes remaining space and scrolls independently) */}
         <div 
           className="sidebar-scroll" 
           style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
         >
-          <div className="nav-label">WORKSPACE</div>
+          <div className="nav-label text-2xl">WORKSPACE</div>
           
           <button
             type="button"
@@ -154,12 +180,41 @@ export default function CommunitySidebar({
             <span>Student directory</span>
           </button>
 
-          {isAdminEmail(user?.email) && (
+          {activeView === "members" && (
+            <section className="sidebar-people" aria-label="Community members">
+              <div className="sidebar-people-heading">
+                <span>COMMUNITY MEMBERS</span>
+                <span>{filteredPeople.length}</span>
+              </div>
+              {filteredPeople.map((person) => (
+                <button
+                  type="button"
+                  className="sidebar-person"
+                  key={person.name}
+                  onClick={() => onMessage(person.name)}
+                  aria-label={`Message ${person.name}, ${person.online ? "online" : "offline"}`}
+                >
+                  <span className="avatar avatar-small" aria-hidden="true">{person.initials}</span>
+                  <span className="sidebar-person-info">
+                    <strong>{person.name}</strong>
+                    <small>{person.role}</small>
+                  </span>
+                  <i
+                    className={`member-status-dot ${person.online ? "member-online" : "member-offline"}`}
+                    aria-label={person.online ? "Online" : "Offline"}
+                    title={person.online ? "Online" : "Offline"}
+                  />
+                </button>
+              ))}
+            </section>
+          )}
+
+          {/* {isAdminEmail(user?.email) && (
             <button type="button" className="nav-item" onClick={onAdmin}>
               <Settings size={18} aria-hidden="true" />
               <span>Admin controls</span>
             </button>
-          )}
+          )} */}
 
           {/* Course Channels */}
           <div className="channel-heading">
@@ -218,10 +273,12 @@ export default function CommunitySidebar({
         {/* User Profile Button (Sticky at bottom) */}
         <div style={{ flexShrink: 0, padding: "12px", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
           <button type="button" className="user-profile" onClick={onToggleProfile} aria-label="Toggle profile settings" style={{ width: "100%", margin: 0 }}>
-            <div className="avatar avatar-orange" aria-hidden="true">{getInitials(userName)}</div>
+            <div className="avatar avatar-orange">
+              {profileImage ? <img src={profileImage} alt="" /> : getInitials(userName)}
+            </div>
             <div className="user-info">
               <strong>{userName}</strong>
-              <span>Student account · Demo</span>
+              <span>Student account ·</span>
             </div>
             <MoreHorizontal size={18} className="muted-icon" aria-hidden="true" />
           </button>
@@ -237,6 +294,31 @@ export default function CommunitySidebar({
               onChange={(event) => onNameDraftChange(event.target.value)}
               maxLength={36}
             />
+            <div className="profile-image-tools">
+              <label className="profile-image-upload">
+                <ImagePlus size={14} aria-hidden="true" />
+                <span>Change profile image</span>
+                <input
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/*"
+                  tabIndex={-1}
+                  onChange={(event) => {
+                    onProfileImageSelect(event.target.files?.[0] ?? null);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              {profileImage && (
+                <button
+                  type="button"
+                  className="profile-image-remove"
+                  onClick={() => onProfileImageSelect(null)}
+                >
+                  Remove image
+                </button>
+              )}
+            </div>
             <button type="button" className="btn btn-primary btn-full" onClick={onSaveName}>
               Save name
             </button>

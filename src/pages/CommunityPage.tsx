@@ -9,6 +9,7 @@ import {
   loadChatMessages,
   loadChatRooms,
   loadChatSettings,
+  type ChatAttachment,
   type ChatMessage,
 } from "../chatData";
 import ChatConversation from "../components/community/ChatConversation";
@@ -24,6 +25,8 @@ import { getInitials } from "../components/community/communityTypes";
 const CURRENT_USER = "You";
 const WELCOME_KEY = "tf-community-welcomed";
 const DISPLAY_NAME_KEY = "tf-community-name";
+const PROFILE_IMAGE_KEY = "tf-community-profile-image";
+const MAX_PROFILE_IMAGE_SIZE = 1 * 1024 * 1024;
 
 const getCurrentTime = (): string =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -31,6 +34,7 @@ const getCurrentTime = (): string =>
 export default function CommunityPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const profileImageStorageKey = `${PROFILE_IMAGE_KEY}:${user?.email?.toLowerCase() ?? "guest"}`;
 
   const [messages, setMessages] = useState<ChatMessage[]>(loadChatMessages);
   const [chatSettings] = useState(loadChatSettings);
@@ -40,6 +44,7 @@ export default function CommunityPage() {
   const [draft, setDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showProfilePopover, setShowProfilePopover] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [showWelcomeModal, setShowWelcomeModal] = useState(
@@ -49,14 +54,23 @@ export default function CommunityPage() {
   const initialUserName = user?.name || localStorage.getItem(DISPLAY_NAME_KEY) || "Student";
   const [userName, setUserName] = useState(initialUserName);
   const [nameDraft, setNameDraft] = useState(initialUserName);
+  const [profileImage, setProfileImage] = useState(
+    () => localStorage.getItem(profileImageStorageKey) ?? ""
+  );
+
+  const showNotification = useCallback((message: string) => {
+    setNoticeMessage(message);
+    const timer = window.setTimeout(() => setNoticeMessage(""), 2800);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(messages));
     } catch {
-      // Storage might be restricted.
+      showNotification("Chat history could not be saved. Browser storage may be full.");
     }
-  }, [messages]);
+  }, [messages, showNotification]);
 
   useEffect(() => {
     try {
@@ -65,12 +79,6 @@ export default function CommunityPage() {
       // Storage might be restricted.
     }
   }, [rooms]);
-
-  const showNotification = useCallback((message: string) => {
-    setNoticeMessage(message);
-    const timer = window.setTimeout(() => setNoticeMessage(""), 2800);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const currentRoom = useMemo(
     () =>
@@ -121,6 +129,64 @@ export default function CommunityPage() {
 
     setMessages((previous) => [...previous, newMessage]);
     setDraft("");
+  };
+
+  const handleSendAttachment = (attachment: ChatAttachment) => {
+    if (!canSendMessage) return;
+    const text = attachment.mimeType.startsWith("image/")
+      ? "Shared an image"
+      : attachment.mimeType.startsWith("audio/")
+      ? "Sent a voice note"
+      : "Shared a file";
+    const newMessage: ChatMessage = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      roomId: activeRoomId,
+      sender: CURRENT_USER,
+      initials: getInitials(userName),
+      text,
+      time: getCurrentTime(),
+      mine: true,
+      attachment,
+    };
+    setMessages((previous) => [...previous, newMessage]);
+  };
+
+  const handleProfileImageSelect = (file: File | null) => {
+    if (!file) {
+      try {
+        localStorage.removeItem(profileImageStorageKey);
+        setProfileImage("");
+        showNotification("Profile image removed.");
+      } catch {
+        showNotification("Could not remove your profile image. Check browser storage.");
+      }
+      return;
+    }
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      showNotification("Choose a supported image file (SVG is not supported).");
+      return;
+    }
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+      showNotification("Profile images must be 1 MB or smaller.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => showNotification("Unable to read this image. Please try another.");
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        showNotification("Unable to read this image. Please try another.");
+        return;
+      }
+      try {
+        localStorage.setItem(profileImageStorageKey, reader.result);
+        setProfileImage(reader.result);
+        showNotification("Profile image updated.");
+      } catch {
+        showNotification("Could not save your profile image. Check browser storage.");
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleStartDirect = useCallback((name: string) => {
@@ -200,12 +266,14 @@ export default function CommunityPage() {
       <CommunitySidebar
         user={user}
         userName={userName}
+        profileImage={profileImage}
         nameDraft={nameDraft}
         rooms={rooms}
         activeView={activeView}
         activeRoomId={activeRoomId}
         searchQuery={searchQuery}
         isOpen={isMobileSidebarOpen}
+        isCollapsed={isSidebarCollapsed}
         showProfile={showProfilePopover}
         onSelectView={handleSelectView}
         onOpenRoom={handleOpenRoom}
@@ -215,6 +283,7 @@ export default function CommunityPage() {
         }}
         onNameDraftChange={setNameDraft}
         onSaveName={handleSaveName}
+        onProfileImageSelect={handleProfileImageSelect}
         onSignOut={() => {
           logout();
           navigate("/login");
@@ -222,17 +291,22 @@ export default function CommunityPage() {
         onAdmin={() => navigate("/admin")}
         onNotification={showNotification}
         onClose={() => setIsMobileSidebarOpen(false)}
+        onToggleCollapse={() => setIsSidebarCollapsed((previous) => !previous)}
+        onMessage={handleStartDirect}
       />
 
       <main className="main-area">
         <CommunityHeader
           userName={userName}
+          profileImage={profileImage}
           activeView={activeView}
           currentRoom={currentRoom}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onNotification={showNotification}
           onOpenMenu={() => setIsMobileSidebarOpen(true)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed((previous) => !previous)}
         />
 
         {activeView === "members" ? (
@@ -245,11 +319,13 @@ export default function CommunityPage() {
               currentRoom={currentRoom}
               messages={currentMessages}
               userName={userName}
+              profileImage={profileImage}
               draft={draft}
               canSendMessage={canSendMessage}
               blockedReason={blockedReason}
               onDraftChange={setDraft}
               onSendMessage={handleSendMessage}
+              onSendAttachment={handleSendAttachment}
               onToggleReaction={handleToggleReaction}
               onNotification={showNotification}
             />
